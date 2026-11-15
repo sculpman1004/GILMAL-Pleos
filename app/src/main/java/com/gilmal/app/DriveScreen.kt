@@ -122,9 +122,12 @@ fun DriveHomeScreen(
     // 버튼을 누르지 않아도 출발 전 요약("오늘은 이런 날…")을 한 번 자동으로 읽어 준다.
     // 경로 날씨까지 받으면 바로, 아직이면 최대 8초 기다렸다가 목적지 예보 기준으로 읽는다.
     var lastAutoBriefing by remember { mutableStateOf("") }
-    LaunchedEffect(destinationName, route.forecastReady, route.routeChecked, demoScene == null, resumeTick) {
+    LaunchedEffect(destinationName, route.forecastReady, route.forecastStatus, route.routeChecked, demoScene == null, resumeTick) {
         val dest = destinationName
-        if (demoScene != null || !route.forecastReady || dest.isNullOrBlank()) return@LaunchedEffect
+        // 예보를 끝내 못 받았어도(연결 실패·자료 부족) '직접 확인' 안내를 읽어 준다
+        val forecastSettled = route.forecastReady ||
+            route.forecastStatus.contains("실패") || route.forecastStatus.contains("부족")
+        if (demoScene != null || !forecastSettled || dest.isNullOrBlank()) return@LaunchedEffect
         val key = "$dest#$resumeTick"
         if (lastAutoBriefing == key) return@LaunchedEffect
         if (!route.routeChecked) kotlinx.coroutines.delay(8_000L)

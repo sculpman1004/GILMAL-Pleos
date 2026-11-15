@@ -175,15 +175,28 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                             var forecastStatus by remember(lat, lon, preview) { mutableStateOf("목적지 예보 확인 중") }
                             // 출발지(현재 위치)를 받으면 한 번 더 조회해 경로 날씨까지 반영한다
                             val hasStart = point != null
-                            LaunchedEffect(lat, lon, preview, hasStart) {
+                            // 예보를 못 받은 상태라면 길말로 돌아올 때마다 다시 시도한다
+                            val retryKey = if (forecast == null) resumeTick else -1
+                            LaunchedEffect(lat, lon, preview, hasStart, retryKey) {
                                 if (lat != null && lon != null && name != null) {
                                     checkBrakes()
+                                    if (forecast == null) forecastStatus = "목적지 예보 확인 중"
                                     try {
                                         val eta = if (preview) null else target?.remainTime
                                         val distance = if (preview) null else target?.remainDistance
                                         val start = point
                                         val result = withContext(Dispatchers.IO) {
-                                            val dest = destinationOutlook(name, lat, lon, eta)
+                                            // 연결이 잠깐 끊겨도 3초·6초 뒤 다시 시도한다
+                                            var attempt = 0
+                                            var fetched: TripForecast? = null
+                                            while (fetched == null) {
+                                                try { fetched = destinationOutlook(name, lat, lon, eta) }
+                                                catch (e: java.io.IOException) {
+                                                    if (++attempt >= 3) throw e
+                                                    kotlinx.coroutines.delay(3_000L * attempt)
+                                                }
+                                            }
+                                            val dest: TripForecast = fetched ?: throw java.io.IOException("forecast")
                                             // 경로 날씨: 현재 위치 → 목적지 사이 여러 지점을 '지나갈 시각' 기준으로 조회
                                             var routeError: String? = null
                                             val route = start?.let {
