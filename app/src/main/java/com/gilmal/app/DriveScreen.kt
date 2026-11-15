@@ -65,7 +65,8 @@ fun DriveHomeScreen(
     voiceStatus: String,
     onPlayVoice: (String) -> Unit,
     onStopVoice: () -> Unit,
-    onOpenTools: () -> Unit
+    onOpenTools: () -> Unit,
+    resumeTick: Int = 0
 ) {
     var demoScene by remember { mutableStateOf<DemoScene?>(null) }
 
@@ -115,6 +116,22 @@ fun DriveHomeScreen(
     // 위험 안내가 새로 바뀌면 자동으로 한 번 읽어 준다 (주의 이상 또는 시연 상황)
     LaunchedEffect(alert.badge, alert.shortSpeech) {
         if (alert.speakAutomatically) onPlayVoice(alert.shortSpeech)
+    }
+
+    // 길말 화면으로 돌아올 때마다(내비 → 길말) 그리고 목적지가 바뀔 때마다
+    // 버튼을 누르지 않아도 출발 전 요약("오늘은 이런 날…")을 한 번 자동으로 읽어 준다.
+    // 경로 날씨까지 받으면 바로, 아직이면 최대 8초 기다렸다가 목적지 예보 기준으로 읽는다.
+    var lastAutoBriefing by remember { mutableStateOf("") }
+    LaunchedEffect(destinationName, route.forecastReady, route.routeChecked, demoScene == null, resumeTick) {
+        val dest = destinationName
+        if (demoScene != null || !route.forecastReady || dest.isNullOrBlank()) return@LaunchedEffect
+        val key = "$dest#$resumeTick"
+        if (lastAutoBriefing == key) return@LaunchedEffect
+        if (!route.routeChecked) kotlinx.coroutines.delay(8_000L)
+        val firstForDest = !lastAutoBriefing.startsWith("$dest#")
+        lastAutoBriefing = key
+        // 새 목적지에서 주의 이상이면 위의 자동 안내가 이미 같은 요약을 읽으므로 중복하지 않는다
+        if (!alert.speakAutomatically || !firstForDest) onPlayVoice(alert.shortSpeech)
     }
 
     // 가는 길 안내 예약: 비 구간 5분 전, 해 지기 15분 전, 휴게 시간에 그 항목만 짧게

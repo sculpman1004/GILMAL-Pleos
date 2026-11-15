@@ -77,6 +77,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
     private val pressures = mutableStateMapOf<String, String>()
     private var pressureGeneration = 0
     private var navigationReady by mutableStateOf(false)
+    // 앱 화면으로 돌아올 때마다 늘어난다 (내비 → 길말 복귀 시 출발 전 안내 자동 재생에 사용)
+    private var resumeTick by mutableStateOf(0)
     private var navigationStatus by mutableStateOf("내비 연결 중")
     private var locationStatus by mutableStateOf("")
     private var weatherPoint by mutableStateOf<Pair<Double, Double>?>(null)
@@ -291,7 +293,8 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
                                     voiceStatus = voiceStatus,
                                     onPlayVoice = { text -> speakOut(text) },
                                     onStopVoice = { stopSpeak() },
-                                    onOpenTools = { showTools = true }
+                                    onOpenTools = { showTools = true },
+                                    resumeTick = resumeTick
                                 )
                             } else {
                                 // 기존 시연·테스트 도구 화면
@@ -385,6 +388,7 @@ class MainActivity : ComponentActivity(), TextToSpeech.OnInitListener {
 
     override fun onResume() {
         super.onResume()
+        resumeTick++
         if (navigationReady) refreshDestination()
     }
 
